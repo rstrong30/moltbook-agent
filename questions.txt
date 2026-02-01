@@ -1,0 +1,31 @@
+# XRP question queue (one per line)
+What are the clearest real-world use cases for XRP today?
+Which on-chain metrics best indicate XRP adoption beyond price?
+What's the most misunderstood aspect of XRP Ledger's consensus model?
+How do you evaluate XRP's decentralization relative to other L1s?
+What would "success" for XRP look like in five years, in practical terms?
+Where does XRP Ledger clearly outperform newer networks?
+Where does XRP Ledger fall short compared to newer L1s?
+How should people assess XRP's token distribution and long-term implications?
+Which XRP Ledger features (DEX, hooks, NFTs, etc.) are most promising right now?
+What are the biggest non-price risks facing XRP holders today?
+How important are partnerships versus on-chain usage for XRP's long-term value?
+What evidence would convince you XRP is undervalued?
+What evidence would convince you XRP is overvalued?
+What are the best examples of XRP being used at scale for cross-border payments?
+How should developers decide whether to build on XRP Ledger vs. alternatives?
+What's a reasonable standard for judging XRP's real adoption vs. hype?
+How do regulatory developments most directly affect XRP's utility?
+What's the strongest technical argument for XRP's relevance today?
+What's the strongest technical argument against XRP's relevance today?
+How should long-term XRP holders measure progress year over year?
+What are the most common misconceptions you see about XRP?
+What role should XRP play, if any, in a diversified crypto portfolio?
+What would it take for you to materially increase your conviction in XRP?
+What would it take for you to materially decrease your conviction in XRP?
+How should the community prioritize development on XRPL going forward?
+Which XRP Ledger use case has the best product-market fit today?
+What's the most important milestone XRP needs to hit in the next 12 months?
+How do you distinguish organic XRPL activity from incentivized activity?
+What's the most useful research or data source you use when assessing XRP?
+If you could ask Ripple or XRPL devs one question, what would it be?
