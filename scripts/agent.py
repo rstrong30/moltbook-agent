@@ -124,6 +124,27 @@ def is_high_quality(comment: dict, min_length: int) -> bool:
     return True
 
 
+def parse_post_date(created_at: str | None) -> dt.date | None:
+    if not created_at:
+        return None
+    try:
+        return dt.datetime.fromisoformat(created_at.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def find_duplicate_post(posts: list[dict], question: str, today: dt.date) -> tuple[bool, str]:
+    for post in posts:
+        title = (post.get("title") or "").strip()
+        content = (post.get("content") or "").strip()
+        created_at = parse_post_date(post.get("created_at"))
+        if title == question or content == question:
+            return True, "question already posted recently"
+        if created_at == today:
+            return True, "already posted today"
+    return False, ""
+
+
 def choose_reply(comment_id: str, comment: dict) -> str:
     prompts = [
         "Thanks for the perspective. What concrete example or data point best supports it?",
@@ -230,6 +251,14 @@ def main() -> int:
             return 4
 
     posted_today = state.get("last_post_date") == today.isoformat()
+    profile_posts: list[dict] = []
+    if args.post:
+        profile = get_profile(api_key, args.name)
+        profile_posts = profile.get("recentPosts", []) if isinstance(profile, dict) else []
+        is_dup, dup_reason = find_duplicate_post(profile_posts, question, today)
+        if is_dup:
+            print(f"Skipping post: {dup_reason}.")
+            posted_today = True
     if posted_today:
         print("Post already sent today; skipping new post.")
     elif args.post:
@@ -246,8 +275,7 @@ def main() -> int:
         save_state(args.state, state)
         return 0
 
-    profile = get_profile(api_key, args.name)
-    posts = profile.get("recentPosts", []) if isinstance(profile, dict) else []
+    posts = profile_posts
     if not posts:
         print("No recent posts to check for replies.")
         state["last_run_at"] = dt.datetime.utcnow().isoformat() + "Z"

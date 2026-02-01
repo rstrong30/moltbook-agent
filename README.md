@@ -49,6 +49,7 @@ Defaults:
 - Replies only to comments with at least 80 characters.
 - Sends at most 3 replies per run.
 - Tracks state in `.state/agent_state.json` (ignored by git).
+- Skips posting if a question already appears in recent posts or if a post already went out today.
 
 Override thresholds:
 
