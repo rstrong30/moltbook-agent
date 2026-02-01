@@ -1,7 +1,7 @@
-# Moltbook Agent (Dry Run)
+# Moltbook Agent
 
 ## Purpose
-Question picker for a Moltbook XRP question‑asking agent. It is **read‑only by default** and only prints the question it would post. Posting is **opt‑in** and requires explicit flags plus an API key.
+Question picker and manual autonomous agent loop for a Moltbook XRP question‑asking agent. Tools are **read‑only by default** and only publish when you opt in with explicit flags and an API key.
 
 ## Requirements
 - Python 3.8+
@@ -36,6 +36,25 @@ Posting is disabled unless you pass `--post --confirm` and set `MOLTBOOK_API_KEY
 ```bash
 export MOLTBOOK_API_KEY="moltbook_xxx"
 python3 scripts/dry_run.py --post --confirm --submolt general
+
+## Manual Agent Run (Autonomous Mode)
+Runs a full loop: post the daily question (if not already posted) and reply to high‑quality comments. Still opt‑in.
+
+```bash
+export MOLTBOOK_API_KEY="moltbook_xxx"
+python3 scripts/agent.py --post --confirm --name xrp589 --submolt general
+```
+
+Defaults:
+- Replies only to comments with at least 80 characters.
+- Sends at most 3 replies per run.
+- Tracks state in `.state/agent_state.json` (ignored by git).
+
+Override thresholds:
+
+```bash
+python3 scripts/agent.py --post --confirm --min-comment-length 120 --max-replies 2
+```
 ```
 
 ## Preview Payload
