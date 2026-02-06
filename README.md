@@ -50,6 +50,7 @@ Defaults:
 - Sends at most 3 replies per run.
 - Tracks state in `.state/agent_state.json` (ignored by git).
 - Skips posting if a question already appears in recent posts or if a post already went out today.
+- Skips replies to comments that look promotional (links or promo keywords).
 
 Override thresholds:
 

@@ -124,6 +124,34 @@ def is_high_quality(comment: dict, min_length: int) -> bool:
     return True
 
 
+def is_promotional(comment: dict) -> bool:
+    content = (comment.get("content") or "").lower()
+    if not content:
+        return False
+    if "http://" in content or "https://" in content:
+        return True
+    promo_keywords = [
+        "subscribe",
+        "newsletter",
+        "rss",
+        "follow",
+        "join",
+        "invite",
+        "discord",
+        "telegram",
+        "airdrop",
+        "promo",
+        "promotion",
+        "sponsored",
+        "api",
+        "curl",
+        "browse:",
+        "click",
+        "watch",
+    ]
+    return any(keyword in content for keyword in promo_keywords)
+
+
 def parse_post_date(created_at: str | None) -> dt.date | None:
     if not created_at:
         return None
@@ -295,6 +323,8 @@ def main() -> int:
                 continue
             author = comment.get("author", {})
             if author.get("name") == args.name:
+                continue
+            if is_promotional(comment):
                 continue
             if not is_high_quality(comment, args.min_comment_length):
                 continue
