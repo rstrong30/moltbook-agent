@@ -42,20 +42,33 @@ Runs a full loop: post the daily question (if not already posted) and reply to h
 
 ```bash
 export MOLTBOOK_API_KEY="moltbook_xxx"
-python3 scripts/agent.py --post --confirm --name xrp589 --submolt general
+python3 scripts/agent.py --post --confirm --name xrp589
 ```
 
 Defaults:
 - Replies only to comments with at least 80 characters.
 - Sends at most 3 replies per run.
-- Tracks state in `.state/agent_state.json` (ignored by git).
+- Tracks state in `~/Library/Application Support/moltbook-agent/agent_state.json`.
 - Skips posting if a question already appears in recent posts or if a post already went out today.
 - Skips replies to comments that look promotional (links or promo keywords).
+- Rotates posting submolt through: general → crypto → todayilearned (override with `--submolt`).
+- Scans submolts (default: crypto, todayilearned, ponderings, showandtell) and replies to high‑quality posts.
 
 Override thresholds:
 
 ```bash
 python3 scripts/agent.py --post --confirm --min-comment-length 120 --max-replies 2
+```
+Override rotation:
+
+```bash
+python3 scripts/agent.py --post --confirm --submolt-rotation general,crypto,ponderings
+```
+
+Override scan list:
+
+```bash
+python3 scripts/agent.py --post --confirm --scan-submolts crypto,showandtell --scan-limit 5
 ```
 ```
 

@@ -15,6 +15,14 @@ API_BASE = "https://www.moltbook.com/api/v1"
 MAX_QUESTION_LENGTH = 300
 DEFAULT_MIN_COMMENT_LENGTH = 80
 DEFAULT_MAX_REPLIES = 3
+DEFAULT_SUBMOLT_ROTATION = ["general", "crypto", "todayilearned"]
+DEFAULT_SCAN_SUBMOLTS = ["crypto", "todayilearned", "ponderings", "showandtell"]
+
+
+def default_state_path() -> str:
+    return os.path.expanduser(
+        "~/Library/Application Support/moltbook-agent/agent_state.json"
+    )
 
 
 def repo_root() -> str:
@@ -57,16 +65,21 @@ def load_state(path: str) -> dict:
             "last_post_date": None,
             "last_post_id": None,
             "replied_comment_ids": [],
+            "commented_post_ids": [],
             "last_run_at": None,
+            "submolt_rotation_index": 0,
         }
     with open(path, "r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
 def save_state(path: str, state: dict) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(state, handle, indent=2, sort_keys=True)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(state, handle, indent=2, sort_keys=True)
+    except PermissionError:
+        print(f"Warning: could not write state file at {path}.")
 
 
 def request_json(url: str, api_key: str, method: str = "GET", payload: dict | None = None) -> dict:
@@ -99,6 +112,13 @@ def get_post(api_key: str, post_id: str) -> dict:
     return request_json(f"{API_BASE}/posts/{post_id}", api_key)
 
 
+def get_submolt_feed(api_key: str, submolt: str, limit: int = 10) -> list[dict]:
+    data = request_json(f"{API_BASE}/submolts/{submolt}/feed?sort=new&limit={limit}", api_key)
+    if isinstance(data, dict) and "posts" in data:
+        return data.get("posts", [])
+    return data if isinstance(data, list) else []
+
+
 def get_comments(api_key: str, post_id: str) -> list[dict]:
     try:
         data = request_json(f"{API_BASE}/posts/{post_id}/comments?sort=new", api_key)
@@ -120,6 +140,17 @@ def is_high_quality(comment: dict, min_length: int) -> bool:
     if len(words) < 8:
         return False
     if content.count("http://") + content.count("https://") > 1:
+        return False
+    return True
+
+
+def is_post_high_quality(post: dict, min_length: int) -> bool:
+    title = (post.get("title") or "").strip()
+    content = (post.get("content") or "").strip()
+    text = f"{title} {content}".strip()
+    if len(text) < min_length:
+        return False
+    if text.count("http://") + text.count("https://") > 1:
         return False
     return True
 
@@ -150,6 +181,34 @@ def is_promotional(comment: dict) -> bool:
         "watch",
     ]
     return any(keyword in content for keyword in promo_keywords)
+
+
+def is_promotional_post(post: dict) -> bool:
+    title = (post.get("title") or "").lower()
+    content = (post.get("content") or "").lower()
+    text = f"{title} {content}".strip()
+    if not text:
+        return False
+    if "http://" in text or "https://" in text:
+        return True
+    promo_keywords = [
+        "subscribe",
+        "newsletter",
+        "rss",
+        "follow",
+        "join",
+        "invite",
+        "discord",
+        "telegram",
+        "airdrop",
+        "promo",
+        "promotion",
+        "sponsored",
+        "giveaway",
+        "mint",
+        "sale",
+    ]
+    return any(keyword in text for keyword in promo_keywords)
 
 
 def parse_post_date(created_at: str | None) -> dt.date | None:
@@ -191,6 +250,21 @@ def choose_reply(comment_id: str, comment: dict) -> str:
     return f"{snippet}{prompts[index]}"
 
 
+def choose_post_reply(post_id: str, post: dict) -> str:
+    prompts = [
+        "Curious how you’d measure that in practice—what metric would you track first?",
+        "What’s the strongest counterargument you’ve heard to this view?",
+        "If you had to pick one concrete example, which would it be?",
+        "What would change your mind on this over the next 6–12 months?",
+    ]
+    title = (post.get("title") or "").strip()
+    snippet = ""
+    if title:
+        snippet = f"Re: \"{title[:120]}\" — "
+    index = abs(hash(post_id)) % len(prompts)
+    return f"{snippet}{prompts[index]}"
+
+
 def post_reply(api_key: str, post_id: str, content: str, parent_id: str | None = None) -> dict:
     payload = {"content": content}
     if parent_id:
@@ -208,10 +282,30 @@ def main() -> int:
         description="Manual autonomous Moltbook agent (read-only by default).",
     )
     parser.add_argument("--name", default="xrp589", help="Agent name.")
-    parser.add_argument("--submolt", default="general", help="Target submolt.")
+    parser.add_argument(
+        "--submolt",
+        default="",
+        help="Target submolt. If empty, uses rotation list.",
+    )
+    parser.add_argument(
+        "--submolt-rotation",
+        default=",".join(DEFAULT_SUBMOLT_ROTATION),
+        help="Comma-separated submolt rotation list.",
+    )
+    parser.add_argument(
+        "--scan-submolts",
+        default=",".join(DEFAULT_SCAN_SUBMOLTS),
+        help="Comma-separated submolts to scan for posts to reply to.",
+    )
+    parser.add_argument(
+        "--scan-limit",
+        type=int,
+        default=8,
+        help="Max posts per submolt to scan.",
+    )
     parser.add_argument(
         "--state",
-        default=os.path.join(repo_root(), ".state", "agent_state.json"),
+        default=default_state_path(),
         help="State file path.",
     )
     parser.add_argument(
@@ -270,6 +364,11 @@ def main() -> int:
     print(f"Selected question #{index} of {len(questions)}:")
     print(question)
 
+    rotation = [s.strip() for s in args.submolt_rotation.split(",") if s.strip()]
+    rotation = rotation or DEFAULT_SUBMOLT_ROTATION
+    rotation_index = state.get("submolt_rotation_index", 0) % len(rotation)
+    target_submolt = args.submolt or rotation[rotation_index]
+
     if args.post:
         if not args.confirm:
             print("Refusing to post without --confirm.")
@@ -290,11 +389,13 @@ def main() -> int:
     if posted_today:
         print("Post already sent today; skipping new post.")
     elif args.post:
-        result = post_question(api_key, args.submolt, question)
+        result = post_question(api_key, target_submolt, question)
         post_id = result.get("post", {}).get("id")
-        print(f"Posted question to {args.submolt}. id={post_id}")
+        print(f"Posted question to {target_submolt}. id={post_id}")
         state["last_post_date"] = today.isoformat()
         state["last_post_id"] = post_id
+        if not args.submolt:
+            state["submolt_rotation_index"] = (rotation_index + 1) % len(rotation)
     else:
         print("Dry run only. No API calls were made.")
 
@@ -311,6 +412,7 @@ def main() -> int:
         return 0
 
     replied_ids = set(state.get("replied_comment_ids", []))
+    commented_post_ids = set(state.get("commented_post_ids", []))
     replies_sent = 0
     for post in posts[:5]:
         post_id = post.get("id")
@@ -338,7 +440,33 @@ def main() -> int:
         if replies_sent >= args.max_replies:
             break
 
+    if replies_sent < args.max_replies:
+        scan_list = [s.strip() for s in args.scan_submolts.split(",") if s.strip()]
+        for submolt in scan_list:
+            feed_posts = get_submolt_feed(api_key, submolt, limit=args.scan_limit)
+            for post in feed_posts:
+                post_id = post.get("id")
+                if not post_id or post_id in commented_post_ids:
+                    continue
+                author = post.get("author", {})
+                if author.get("name") == args.name:
+                    continue
+                if is_promotional_post(post):
+                    continue
+                if not is_post_high_quality(post, args.min_comment_length):
+                    continue
+                reply_text = choose_post_reply(str(post_id), post)
+                post_reply(api_key, post_id, reply_text)
+                print(f"Replied to post {post_id} in {submolt}.")
+                commented_post_ids.add(post_id)
+                replies_sent += 1
+                if replies_sent >= args.max_replies:
+                    break
+            if replies_sent >= args.max_replies:
+                break
+
     state["replied_comment_ids"] = sorted(replied_ids)
+    state["commented_post_ids"] = sorted(commented_post_ids)
     state["last_run_at"] = dt.datetime.utcnow().isoformat() + "Z"
     save_state(args.state, state)
     print(f"Replies sent: {replies_sent}")
